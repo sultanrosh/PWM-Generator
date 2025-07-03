@@ -156,6 +156,33 @@ The shift register is 8 bits wide:
 - If you shift fewer than 8 times and then load, the value is incomplete
 - Therefore, timing is critical and must align with design expectations
 
+
+### Aha 5: Bit Indexing in Verilog Is Not the Same as "Left to Right"
+One of the key realizations during this project came from debugging why the PWM duty cycle was being incorrectly latched.
+
+At first, the testbench was feeding in the serial data using the loop:
+
+for (i = 0; i < 8; i = i + 1)
+  S_in = byte_to_shift[i];
+  
+This loop fed i = 0 as the first bit, which was assumed to be the MSB — the "beginning" of the number. But in Verilog, byte_to_shift[0] is the least significant bit (LSB).
+
+That meant the design was actually receiving the bits in reverse order from what it expected.
+
+The hardware itself was functioning correctly: the shift register shifted left and inserted new bits at the LSB position — a process that requires the MSB to be fed first. But the testbench was feeding the LSB first, which led to the final value being reversed (e.g., expecting 0x8C but loading 0x31).
+
+This uncovered a core concept of hardware design:
+
+In Verilog, index 0 always refers to the LSB, not the leftmost bit. Bit index corresponds to bit significance — not sequence position.
+
+Fix:
+The testbench was corrected to feed MSB first by reversing the loop:
+
+for (i = 7; i >= 0; i = i - 1)
+  S_in = byte_to_shift[i];
+  
+This aligned the testbench logic with the design’s shifting behavior and resolved the mismatch between simulated input and hardware expectations.
+
 ---
 
 ## Debugging Log and Design Evolution
